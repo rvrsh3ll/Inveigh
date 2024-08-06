@@ -1,7 +1,7 @@
 ﻿/*
  * BSD 3-Clause License
  *
- * Copyright (c) 2022, Kevin Robertson
+ * Copyright (c) 2024, Kevin Robertson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -82,9 +82,13 @@ namespace Quiddity
                             }
                             while (!tcpAsync.IsCompleted);
 
-                            TcpClient tcpClient = tcpListener.EndAcceptTcpClient(tcpAsync);
-                            object[] parameters = { tcpClient, port };
-                            ThreadPool.QueueUserWorkItem(new WaitCallback(ReceiveClient), parameters);
+                            if (isRunning)
+                            {
+                                TcpClient tcpClient = tcpListener.EndAcceptTcpClient(tcpAsync);
+                                object[] parameters = { tcpClient, port };
+                                ThreadPool.QueueUserWorkItem(new WaitCallback(ReceiveClient), parameters);
+                            }
+
                         }
                         catch (Exception ex)
                         {

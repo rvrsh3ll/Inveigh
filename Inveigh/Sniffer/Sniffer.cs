@@ -21,6 +21,8 @@ namespace Inveigh
 {
     class Sniffer
     {
+        public static bool isRunning = false;
+
         public static void Start(string protocol, string snifferIP, bool isIPV6)
         {
             byte[] snifferIn = new byte[4] { 1, 0, 0, 0 };
@@ -31,6 +33,7 @@ namespace Inveigh
             IPEndPoint snifferIPEndPoint;
             EndPoint snifferEndPoint;
             AddressFamily addressFamily = AddressFamily.InterNetwork;
+            IAsyncResult ipAsync;
 
             if (isIPV6)
             {
@@ -87,9 +90,10 @@ namespace Inveigh
                 throw;
             }         
             
-            int packetLength;
+            int packetLength = 0;
+            isRunning = true;
 
-            while (Program.isRunning)
+            while (isRunning)
             {
 
                 try
@@ -98,17 +102,35 @@ namespace Inveigh
                     SocketFlags socketFlags = SocketFlags.None;
 
                     try
-                    {                     
-                        packetLength = snifferSocket.ReceiveMessageFrom(snifferBuffer, 0, snifferBuffer.Length, ref socketFlags, ref snifferEndPoint, out packetInformation);
-                        snifferData = new byte[packetLength];
-                        Buffer.BlockCopy(snifferBuffer, 0, snifferData, 0, packetLength);
+                    {
+                        ipAsync = snifferSocket.BeginReceiveMessageFrom(snifferBuffer, 0, snifferBuffer.Length, socketFlags, ref snifferEndPoint, null, null);
+
+                        do
+                        {
+                            Thread.Sleep(10);
+
+                            if (!isRunning)
+                            {
+                                break;
+                            }
+
+                        }
+                        while (!ipAsync.IsCompleted);
+
+                        if (isRunning)
+                        {
+                            packetLength = snifferSocket.EndReceiveMessageFrom(ipAsync, ref socketFlags, ref snifferEndPoint, out packetInformation);
+                            snifferData = new byte[packetLength];
+                            Buffer.BlockCopy(snifferBuffer, 0, snifferData, 0, packetLength);
+                        }
+
                     }
                     catch
                     {
                         packetLength = 0;
                     }
-
-                    if (packetLength > 0)
+                    
+                    if (packetLength > 0 && isRunning)
                     {
                         IPHeader ipHeader = new IPHeader();
                         MemoryStream memoryStream = new MemoryStream(snifferData, 0, packetLength);
@@ -591,7 +613,13 @@ namespace Inveigh
                                                     string user = Encoding.Unicode.GetString(ntlmResponse.UserName);
                                                     string host = Encoding.Unicode.GetString(ntlmResponse.Workstation);
                                                     string response = BitConverter.ToString(ntlmResponse.NtChallengeResponse).Replace("-", "");
-                                                    string lmResponse = BitConverter.ToString(ntlmResponse.LmChallengeResponse).Replace("-", "");
+                                                    string lmResponse = "";
+
+                                                    if (!Utilities.ArrayIsNullOrEmpty(ntlmResponse.UserName))
+                                                    {
+                                                        lmResponse = BitConverter.ToString(ntlmResponse.LmChallengeResponse).Replace("-", "");
+                                                    }
+
                                                     Output.NTLMOutput(user, domain, challenge, response, clientIP, host, "SMB", listenerPort, clientPort, lmResponse);
                                                 }
 
@@ -673,11 +701,12 @@ namespace Inveigh
 
                                         if (!BitConverter.ToString(smb2SessionSetupRequest.Buffer).Contains("2A-86-48-86-F7-12-01-02-02")) // kerberos
                                         {
+
                                             NTLMHelper ntlmHelper = new NTLMHelper(smb2SessionSetupRequest.Buffer);
 
                                             if (ntlmHelper.Signature.StartsWith("NTLMSSP"))
                                             {
-
+                                                
                                                 if (ntlmHelper.MessageType == 3)
                                                 {
                                                     NTLMResponse ntlmResponse = new NTLMResponse(smb2SessionSetupRequest.Buffer);
@@ -687,7 +716,13 @@ namespace Inveigh
                                                     string user = Encoding.Unicode.GetString(ntlmResponse.UserName);
                                                     string host = Encoding.Unicode.GetString(ntlmResponse.Workstation);
                                                     string response = BitConverter.ToString(ntlmResponse.NtChallengeResponse).Replace("-", "");
-                                                    string lmResponse = BitConverter.ToString(ntlmResponse.LmChallengeResponse).Replace("-", "");
+                                                    string lmResponse = "";
+
+                                                    if (!Utilities.ArrayIsNullOrEmpty(ntlmResponse.UserName))
+                                                    {
+                                                        lmResponse = BitConverter.ToString(ntlmResponse.LmChallengeResponse).Replace("-", "");
+                                                    }
+                                                    
                                                     Output.NTLMOutput(user, domain, challenge, response, clientIP, host, "SMB", listenerPort, clientPort, lmResponse);
                                                 }
 

@@ -29,56 +29,42 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using Quiddity.DNS;
-using Quiddity.Support;
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
 
-namespace Quiddity.MDNS
+namespace Quiddity.SMB
 {
-    class MDNSChecker : DNSChecker
+    class SMBCOMNegotiateRequest
     {
-        public string[] Questions { get; set; }
-        public string OutputQuestionDenied { get; set; }
+        //https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/25c8c3c9-58fc-4bb8-aa8f-0272dede84c5
+        public byte WordCount { get; set; }
+        public ushort ByteCount { get; set; }
+        public byte[] Dialects{ get; set; }
 
-        public MDNSChecker()
+        public SMBCOMNegotiateRequest()
         {
-            this.OutputReplyAllowed = "response sent";
-            this.OutputInspect = "inspect only";
-            this.OutputDisabled = "disabled";
-            this.OutputHostDenied = "host ignored";
-            this.OutputIPDenied = "IP ignored";
-            this.OutputTypeDenied = "type ignored";
-            this.OutputServiceDenied = "service ignored";
-            this.OutputRepeat = "previous capture";
-            this.OutputQuestionDenied = "question type ignored";
+            this.WordCount = 0;
+            this.ByteCount = 120;
+            this.Dialects = new byte[120] { 0x02, 0x50, 0x43, 0x20, 0x4e, 0x45, 0x54, 0x57, 0x4f, 0x52, 0x4b, 0x20, 0x50, 0x52, 0x4f, 0x47, 0x52, 0x41, 0x4d, 0x20, 0x31, 0x2e, 0x30, 0x00, 0x02, 0x4c, 0x41, 0x4e, 0x4d, 0x41, 0x4e, 0x31, 0x2e, 0x30, 0x00, 0x02, 0x57, 0x69, 0x6e, 0x64, 0x6f, 0x77, 0x73, 0x20, 0x66, 0x6f, 0x72, 0x20, 0x57, 0x6f, 0x72, 0x6b, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x73, 0x20, 0x33, 0x2e, 0x31, 0x61, 0x00, 0x02, 0x4c, 0x4d, 0x31, 0x2e, 0x32, 0x58, 0x30, 0x30, 0x32, 0x00, 0x02, 0x4c, 0x41, 0x4e, 0x4d, 0x41, 0x4e, 0x32, 0x2e, 0x31, 0x00, 0x02, 0x4e, 0x54, 0x20, 0x4c, 0x4d, 0x20, 0x30, 0x2e, 0x31, 0x32, 0x00, 0x02, 0x53, 0x4d, 0x42, 0x20, 0x32, 0x2e, 0x30, 0x30, 0x32, 0x00, 0x02, 0x53, 0x4d, 0x42, 0x20, 0x32, 0x2e, 0x3f, 0x3f, 0x3f, 0x00 };
         }
 
-        public virtual bool Check(string name, string question, string type, string clientIP)
+        public byte[] GetBytes()
         {
 
-            if (!Check(name, type, clientIP))
+            using (MemoryStream memoryStream = new MemoryStream())
             {
-                return false;
-            }
-            else if (!QuestionIsAllowed(question))
-            {
-                this.OutputMessage = this.OutputQuestionDenied;
-                return false;
-            }
-            
-            return true;
-        }
-
-        public bool QuestionIsAllowed(string question)
-        {
- 
-            if (!Utilities.ArrayIsNullOrEmpty(this.Questions) && !Array.Exists(this.Questions, element => element == question.ToUpper()))
-            {
-                return false;
+                PacketWriter packetWriter = new PacketWriter(memoryStream);
+                packetWriter.Write(this.WordCount);
+                packetWriter.Write(this.ByteCount);
+                packetWriter.Write(this.Dialects);
+                return memoryStream.ToArray();
             }
 
-            return true;
         }
 
     }
+    
 }
